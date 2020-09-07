@@ -79,7 +79,6 @@
 			var tempPick;
 			var previousPick = undefined;
 			var Decorations = [];
-			var tempString = "";
 			var DecImage = [];
            
 		    scene.fogMode = BABYLON.Scene.FOGMODE_EXP2;
@@ -138,15 +137,15 @@
 
 			}  
 			
-			for (var i = 1; i < 11; i++) {
-				eval("var box" + i + " = BABYLON.MeshBuilder.CreateBox(\"box" + i + "\", {size: 2}, scene);");
-				eval("box" + i + ".material = new BABYLON.StandardMaterial(\"box" + i + "mat\", scene);");
-				eval("box" + i + ".material.diffuseColor = new BABYLON.Color3(Math.random(1),Math.random(1),Math.random(1));");
-				eval("box" + i + ".position = new BABYLON.Vector3(getRandomIntInclusive(-20, 20),1,getRandomIntInclusive(-20, 20));");					
-				eval("box" + i + ".outlineColor =  new BABYLON.Color3(Math.random(1),Math.random(1),Math.random(1));");
-				eval("box" + i + ".outlineWidth = 0.1;");
-				eval("box" + i + ".group = \"BOX\";");				
-				eval("createLabel(box" + i + ");");
+			for (let i = 1; i < 11; i++) {
+			    let box = BABYLON.MeshBuilder.CreateBox(`box-${i}`, {size: 2}, scene);
+                box.material = new BABYLON.StandardMaterial(`box-${i}-mat`, scene);
+                box.material.diffuseColor = new BABYLON.Color3(Math.random(),Math.random(),Math.random());
+                box.position = new BABYLON.Vector3(getRandomIntInclusive(-20, 20),1,getRandomIntInclusive(-20, 20));
+                box.outlineColor = new BABYLON.Color3(Math.random(),Math.random(),Math.random());
+                box.outlineWidth = 0.1;
+                box.group = "BOX";
+                createLabel(box);
 			}		
 						
 			//--------------------   CONTROLLER --------------------
@@ -501,36 +500,17 @@
 					DecGrid.height = "0px";
 				}
 
-				function AssignDecList() {
-					for(i=0;i<DecImage.length;i++) {
-						DecImage[i].onPointerClickObservable.add(function() {
-                            Decorations.push(DecorationsMap[i].create());
-						});					
-					}
-				}
-
 				function PopulateDecGrid() {
-					var stepbool = false;
-					var j = 0;
-					var i = -1;
 					if (DecListInput.text == "") {
 						for (let c = 0; c < DecorationsMap.length; c++) {
-							if (stepbool == false) {
-							    j = 0;
-							    i++;
-							} else {
-							    j = 1;
-							}
 							DecImage[c] = new BABYLON.GUI.Image(DecorationsMap[c].title, DecorationsMap[c].icon);
 							DecImage[c].isPointerBlocker = true;
 							DecImage[c].group = "DecImage";
                             DecImage[c].onPointerClickObservable.add(() => {
                                 Decorations.push(DecorationsMap[c].create());
                             });
-                            DecGrid.addControl(DecImage[c], i, j);
-							stepbool = !stepbool;						
+                            DecGrid.addControl(DecImage[c], c/2, c%2);
 						}
-                        AssignDecList();
                     }
 				}
 
