@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+        <title>HoE</title>
+
+        <style>
+            html, body {
+                overflow: hidden;
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+            }
+
+            #renderCanvas {
+                width: 100%;
+                height: 100%;
+                touch-action: none
+            }
+        </style>
+
+        <script src="https://preview.babylonjs.com/babylon.js"></script>
+        <script src="https://preview.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+        <script src="https://code.jquery.com/pep/0.4.3/pep.js"></script>
+		<script src="https://preview.babylonjs.com/gui/babylon.gui.js"></script>
+    </head>
+
+   <body>
+
+    <canvas id="renderCanvas" touch-action="none"></canvas>
+
+    <script>
+        var canvas = document.getElementById("renderCanvas");
+        var engine = new BABYLON.Engine(canvas, true, { stencil: true });
+
+		function getRandomIntInclusive(min, max) {
+		  min = Math.ceil(min);
+		  max = Math.floor(max);
+		  return Math.floor(Math.random() * (max - min + 1)) + min;
+		}
+
+        var createScene = function () {
+           
+            var scene = new BABYLON.Scene(engine);
+			
+			//--------------------   SETUP   --------------------
+			
+			var advancedTexture = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("UI");
+						
+			//var envtexture = new BABYLON.CubeTexture("https://www.babylonjs-playground.com/textures/SpecularHDR.dds", scene);
+			//scene.createDefaultSkybox(envtexture, true, 1000);
+			
+			var tempPick;
+			var previousPick = undefined;
+			var Decorations = [];
+			var DecCount = 0;
+			var tempString = "";
+			var DecImage = [];
+           
+		    scene.fogMode = BABYLON.Scene.FOGMODE_EXP2;
+			scene.fogDensity = 0.005;
+			scene.fogColor = new BABYLON.Color3(0.9, 0.9, 0.95);
+		   
+            var camera = new BABYLON.FlyCamera("camera", new BABYLON.Vector3(0, 5, -10), scene);
+			camera.rollCorrect = 10;
+			camera.bankedTurn = true;
+			camera.bankedTurnLimit = Math.PI / 2;
+			camera.bankedTurnMultiplier = 1;
+            camera.attachControl(canvas, true);
+           
+            var envlight = new BABYLON.HemisphericLight("envlight", new BABYLON.Vector3(0.5, 0.5, 0), scene);
+			envlight.intensity = 1;			
+			
+			var myGround = BABYLON.MeshBuilder.CreateGround("myGround", {width: 400, height: 400}, scene);
+			myGround.group = "Ground";
+			//myGround.isPickable = false;					
+
+			//--------------------   DECORATIONS TABLE   --------------------
+
+			var DecorationsTable = [
+				['Box','textures/box_icon.png','DecImage[c].onPointerClickObservable.add(function() {Decorations[DecCount] = new BABYLON.MeshBuilder.CreateBox("", {size: 5}, scene);DecCount++;});'],
+				['Sphere','textures/sphere_icon.png','DecImage[c].onPointerClickObservable.add(function() {Decorations[DecCount] = new BABYLON.MeshBuilder.CreateSphere("", {diameter: 5}, scene);DecCount++;});'],
+				['Pyramid','textures/pyramid_icon.png','DecImage[c].onPointerClickObservable.add(function() {Decorations[DecCount] = new BABYLON.MeshBuilder.CreateCylinder("", {diameter: 5, diameterTop: 0, tessellation: 4}, scene);DecCount++;});']
+			];
+			
+			var DecCreateFunc = [];
+			
+			//--------------------   PICKER   --------------------
+								
+			function pickResult() {
+				var ray = scene.createPickingRay(scene.pointerX, scene.pointerY, BABYLON.Matrix.Identity(), camera);
+				var hit = scene.multiPickWithRay(ray);
+				var closestPick = hit[0];
+				for (var i = 0; i < hit.length + 1; i++) {					
+					if (hit[i] !== undefined) {
+						if (hit[i].pickedMesh.renderingGroupId == 3) {
+							return hit[i];
+						}
+						if(closestPick.distance>hit[i].distance){closestPick=hit[i]};
+					}					
+				}
+				return closestPick;
+			}			
+			
+		    //--------------------   testing boxes --------------------
+						
+			var createLabel = function(mesh) {
+				var label = new BABYLON.GUI.Rectangle("label for " + mesh.name);
+				label.background = "black"
+				label.height = "25px";
+				label.alpha = 0.3;
+				label.width = "70px";
+				label.cornerRadius = 10;
+				label.thickness = 1;
+				label.linkOffsetY = 30;
+				advancedTexture.addControl(label); 
+				label.linkWithMesh(mesh);
+
+				var text1 = new BABYLON.GUI.TextBlock();
+				text1.text = mesh.name;
+				text1.color = "white";
+				label.addControl(text1); 
+
+			}  
+			
+			for (var i = 1; i < 11; i++) {
+				eval("var box" + i + " = BABYLON.MeshBuilder.CreateBox(\"box" + i + "\", {size: 2}, scene);");
+				eval("box" + i + ".material = new BABYLON.StandardMaterial(\"box" + i + "mat\", scene);");
+				eval("box" + i + ".material.diffuseColor = new BABYLON.Color3(Math.random(1),Math.random(1),Math.random(1));");
+				eval("box" + i + ".position = new BABYLON.Vector3(getRandomIntInclusive(-20, 20),1,getRandomIntInclusive(-20, 20));");					
+				eval("box" + i + ".outlineColor =  new BABYLON.Color3(Math.random(1),Math.random(1),Math.random(1));");
+				eval("box" + i + ".outlineWidth = 0.1;");
+				eval("box" + i + ".group = \"BOX\";");				
+				eval("createLabel(box" + i + ");");
+			}		
+						
+			//--------------------   CONTROLLER --------------------
+			
+			var deltaTheta = 0.1;
+			var deltaY = 0.005;
+			var theta = 0;
+			
+			//inner circle
+			var myPoints = [];
+			var radius = 1.5;			
+			for (var i = 0; i<64; i++) {
+				myPoints.push(new BABYLON.Vector3(radius * Math.cos(theta), 0, radius * Math.sin(theta)));
+				theta += deltaTheta;
+			}			
+			var innerCircle = BABYLON.MeshBuilder.CreateLines("innerCircle", {points: myPoints}, scene); 
+			innerCircle.group = "Controller";
+			innerCircle.color = new BABYLON.Color3(1, 1, 0);	
+			innerCircle.renderingGroupId = 3;
+			innerCircle.isPickable = false;
+			
+			//inner fill
+			var innerFill = BABYLON.MeshBuilder.CreateSphere("innerFill", {diameter: 3, diameterY: 0.01}, scene);
+			var innerFillMat = new BABYLON.StandardMaterial("innerFillMat", scene);
+			innerFill.group = "Controller";
+			innerFillMat.diffuseColor = new BABYLON.Color3(0.8, 0.8, 0);
+			innerFillMat.alpha = 0.2;
+			innerFill.material = innerFillMat;
+			innerFill.renderingGroupId = 3;
+			
+			
+			innerFillAM = new BABYLON.ActionManager(scene);
+			
+			innerFillAM.registerAction(new BABYLON.ExecuteCodeAction(
+				BABYLON.ActionManager.OnPointerOverTrigger, function(){
+					innerFillMat.alpha = 0.5;
+				}
+			));
+			
+			innerFillAM.registerAction(new BABYLON.ExecuteCodeAction(
+				BABYLON.ActionManager.OnPointerOutTrigger, function(){
+					innerFillMat.alpha = 0.2;
+				}
+			));			
+			
+			innerFill.actionManager = innerFillAM;		
+			
+			//outer circle
+			var myPoints = [];
+			var radius = 2.5;			
+			for (var i = 0; i<64; i++) {
+				myPoints.push(new BABYLON.Vector3(radius * Math.cos(theta), 0, radius * Math.sin(theta)));
+				theta += deltaTheta;
+			}			
+			var outerCircle = BABYLON.MeshBuilder.CreateLines("outerCircle", {points: myPoints}, scene);
+			outerCircle.group = "Controller";			
+			outerCircle.color = new BABYLON.Color3(1, 1, 0);
+			outerCircle.renderingGroupId = 3;
+			outerCircle.isPickable = false;
+			
+			
+			//outer fill
+			var outerFill = BABYLON.MeshBuilder.CreateTorus("outerFill", {diameter: 4, thickness: 1, tessellation: 64}, scene);
+			outerFill.group = "Controller";	
+			outerFill.scaling = new BABYLON.Vector3(1, 0.01, 1);
+			var outerFillMat = new BABYLON.StandardMaterial("outerFillMat", scene);
+			outerFillMat.diffuseColor = new BABYLON.Color3(1, 1, 0);
+			outerFillMat.alpha = 0.2;
+			outerFill.material = outerFillMat;
+			outerFill.renderingGroupId = 3;
+			
+			outerFillAM = new BABYLON.ActionManager(scene);
+			
+			outerFillAM.registerAction(new BABYLON.ExecuteCodeAction(
+				BABYLON.ActionManager.OnPointerOverTrigger, function(){
+					outerFillMat.alpha = 0.5;
+				}
+			));
+			
+			outerFillAM.registerAction(new BABYLON.ExecuteCodeAction(
+				BABYLON.ActionManager.OnPickTrigger, function(){
+				}
+			));
+			
+			outerFillAM.registerAction(new BABYLON.ExecuteCodeAction(
+				BABYLON.ActionManager.OnPointerOutTrigger, function(){
+					outerFillMat.alpha = 0.2;
+				}
+			));			
+			
+			outerFill.actionManager = outerFillAM;
+			
+			//pointer
+			var pointerPoints = [
+				new BABYLON.Vector3(0, 0, 1.5),
+				new BABYLON.Vector3(0, 0, 2.5),
+			]
+			var controllerPointer = BABYLON.MeshBuilder.CreateLines("controllerPointer", {points: pointerPoints}, scene); 
+			controllerPointer.group = "Controller";
+			controllerPointer.color = new BABYLON.Color3(1, 1, 0);	
+			controllerPointer.renderingGroupId = 3;
+			controllerPointer.isPickable = false;			
+			
+			//			
+			innerFill.addChild(innerCircle);
+			innerFill.addChild(outerCircle);
+			innerFill.addChild(outerFill);
+			innerFill.addChild(controllerPointer);
+			
+			//Hide and Show functions		
+			function hideController() {
+			innerFill.scaling = new BABYLON.Vector3(0.01, 0.01, 0.01);
+				innerFill.visibility = 0;
+				innerCircle.visibility = 0;
+				outerFill.visibility = 0;
+				outerCircle.visibility = 0;
+			}
+			
+			function showController() {
+				innerFill.scaling = new BABYLON.Vector3(1, 1, 1);
+				innerFill.visibility = 1;
+				innerCircle.visibility = 1;
+				outerFill.visibility = 1;
+				outerCircle.visibility = 1;
+			}
+
+			hideController();
+			
+			//--------------------   MOUSE EVENTS   --------------------
+			
+			movingMode = false;
+			rotatingMode = false;
+			selected = null;
+			
+			scene.onPointerObservable.add((pointerInfo) => {
+				switch (pointerInfo.type) {
+				
+					case BABYLON.PointerEventTypes.POINTERDOWN:
+						tempPick = pickResult();
+						if (tempPick !== undefined) {
+							if(tempPick.pickedMesh.group == 'Controller') {
+								camera.detachControl(canvas)
+								switch (tempPick.pickedMesh.name) {
+									case 'innerFill':
+										movingMode = true;
+									break;
+									
+									case 'outerFill':
+										rotatingMode = true;
+									break;
+								}
+							}
+						}
+					break;
+					
+					case BABYLON.PointerEventTypes.POINTERUP:
+						camera.attachControl(canvas, true);
+						movingMode = false;
+						rotatingMode = false;
+					break;
+					
+					case BABYLON.PointerEventTypes.POINTERMOVE:					
+						tempPick = pickResult();
+						
+						if (tempPick !== undefined) {
+								if(tempPick.pickedMesh.group == 'BOX') {
+									if(previousPick!==tempPick && previousPick!==undefined){
+										previousPick.pickedMesh.renderOutline = false;									
+									}
+									tempPick.pickedMesh.renderOutline = true;
+									previousPick = tempPick;									
+								}
+								else {
+									if (previousPick !== undefined) { previousPick.pickedMesh.renderOutline = false; };	
+								}
+						}	
+
+						if(movingMode == true) {
+							innerFill.position = moveResult();
+						}
+						
+						if(rotatingMode == true) {
+							innerFill.lookAt(moveResult());
+							//console.log(innerFill.rotation);
+						}
+						
+						if(selected!== null) {selected.pickedMesh.renderOutline = true;};
+						
+					break;
+					
+					case BABYLON.PointerEventTypes.POINTERWHEEL:
+					break;
+					
+					case BABYLON.PointerEventTypes.POINTERPICK:
+					break;
+					
+					case BABYLON.PointerEventTypes.POINTERTAP:
+						tempPick = pickResult();						
+						if (tempPick !== undefined) {
+							console.log(tempPick.pickedMesh);
+							switch (tempPick.pickedMesh.group) {	
+							
+								case 'BOX':
+									if(selected!== null) {
+										selected.pickedMesh.renderOutline = false;
+										innerFill.removeChild(selected.pickedMesh);
+									}
+									selected = tempPick;
+									showController();
+									innerFill.rotation = new BABYLON.Vector3(0,selected.pickedMesh.rotation.y,0);
+									innerFill.position = new BABYLON.Vector3(selected.pickedMesh.position.x,0,selected.pickedMesh.position.z);
+									innerFill.addChild(selected.pickedMesh);
+								break;
+								
+								case 'Controller':
+								
+								break;
+								
+								case 'Ground':
+									if(selected!== null) {
+										selected.pickedMesh.renderOutline = false;
+										innerFill.removeChild(selected.pickedMesh);
+										selected = null;
+										hideController();
+									}
+									
+								break;
+							}
+						}
+					break;
+					
+					case BABYLON.PointerEventTypes.POINTERDOUBLETAP:
+						//console.log("POINTER DOUBLE-TAP");
+					break;
+				}
+			});		
+
+			//--------------------   KEYBOARD EVENTS   --------------------
+			
+			scene.onKeyboardObservable.add((kbInfo) => {
+				switch (kbInfo.type) {
+					case BABYLON.KeyboardEventTypes.KEYDOWN:
+						//console.log("KEY DOWN: ", kbInfo.event.key);
+						switch (kbInfo.event.key) {
+							case 'Delete':
+								//console.log("KEY DOWN: ", kbInfo.event.key);
+								if(selected!== null) {scene.removeMesh(selected.pickedMesh, true); hideController();};
+							break;
+						}
+						break;
+					case BABYLON.KeyboardEventTypes.KEYUP:
+						
+						//console.log("KEY UP: ", kbInfo.event.keyCode);
+						break;
+				}
+			});			
+
+			//--------------------   MOVER   --------------------
+
+			function moveResult() {
+				var ray = scene.createPickingRay(scene.pointerX, scene.pointerY, BABYLON.Matrix.Identity(), camera);
+				var hit = scene.multiPickWithRay(ray);
+				for (var i = 0; i < hit.length + 1; i++) {					
+					if (hit[i] !== undefined) {
+						if (hit[i].pickedMesh.name == 'myGround') {						
+							return new BABYLON.Vector3(Math.round(hit[i].pickedPoint.x),0,Math.round(hit[i].pickedPoint.z));
+						}
+					}					
+				}
+				return null;
+			}				
+
+			//--------------------   GUI   --------------------
+
+				// INFO BUTTON
+				var InfoButton = BABYLON.GUI.Button.CreateSimpleButton("InfoButton", "i");
+				InfoButton.fontSize = "40";
+				InfoButton.width = "64px"
+				InfoButton.height = "64px";
+				InfoButton.color = "white";
+				InfoButton.background = "#202020";
+				InfoButton.horizontalAlignment = 3;
+				InfoButton.verticalAlignment = 1;
+				InfoButton.left = "32px";
+				InfoButton.top = "-32px";
+				advancedTexture.addControl(InfoButton);  
+				//v
+				InfoButton.onPointerClickObservable.add(function() {
+					for(var i = 0; i < Decorations.length; i++) { console.log(Decorations[i]) };
+				});
+
+				// DECORATIONS BUTTON
+				var DecListShowing = false;
+				
+				var DecButton = BABYLON.GUI.Button.CreateSimpleButton("DecButton", "d");
+				DecButton.fontSize = "40";
+				DecButton.width = "64px"
+				DecButton.height = "64px";
+				DecButton.color = "white";
+				DecButton.background = "#202020";
+				DecButton.horizontalAlignment = 3;
+				DecButton.verticalAlignment = 1;
+				DecButton.left = "108px";
+				DecButton.top = "-32px";
+				advancedTexture.addControl(DecButton);
+				//v				
+				DecButton.onPointerClickObservable.add(function() {
+					switch (DecListShowing) {
+						case false:
+							advancedTexture.addControl(DecList);
+							DecListShowing = true;
+						break;
+						case true:
+							advancedTexture.removeControl(DecList);
+							DecListShowing = false;
+							
+						break;
+					}
+				});				
+				
+				// DECORATIONS LIST
+				var DecList = new BABYLON.GUI.Rectangle();
+				DecList.width = "530px";
+				DecList.height = "700px";
+				DecList.background = "rgba(0,0,0,0.8)";
+				DecList.thickness = 2;
+				DecList.horizontalAlignment = 3;
+				DecList.verticalAlignment = 1;
+				DecList.left = "32px";
+				DecList.top = "-108px";
+				
+				var DecGrid = new BABYLON.GUI.Grid();				
+				DecGrid.height = "0px";
+				
+				var DecScrollViewer = new BABYLON.GUI.ScrollViewer();
+				DecScrollViewer.height = "636px";
+				DecScrollViewer.barColor = "#FFFFFF";
+				DecScrollViewer.barBackground = "#202020";
+				DecScrollViewer.verticalAlignment = 1;
+				DecScrollViewer.thickness = 0;
+				DecList.addControl(DecScrollViewer);
+				DecScrollViewer.addControl(DecGrid);
+				
+
+				function ClearDecGrid() {
+					var DecRows = DecGrid.rowCount;
+					for (var i = 0; i <= DecRows; i++) {
+						DecGrid.removeRowDefinition(i);
+					}
+					DecGrid.removeColumnDefinition(0);
+					DecGrid.removeColumnDefinition(1);
+					DecGrid.height = "0px";
+				}
+
+				function AssignDecList() {
+					for(i=0;i<DecImage.length;i++) {
+						//console.log(i);
+						tempString = "Decorations[DecCount] = " + DecorationsTable[i][2];
+						console.log(tempString);
+						DecImage[i].onPointerClickObservable.add(function() {
+						eval(tempString);
+						DecCount++;
+						});					
+					}
+				}
+
+				function PopulateDecGrid() {
+					var stepbool = false;
+					var j = 0;
+					var i = -1;	
+					
+					if (DecListInput.text == "") {
+						for (var c = 0; c < DecorationsTable.length; c++) {
+							DecCreateFunc[c] = DecorationsTable[c][2];
+							if (stepbool == false){j = 0; i++;} else {j = 1};
+							DecImage[c] = new BABYLON.GUI.Image(DecorationsTable[c][0], DecorationsTable[c][1]);
+							DecImage[c].isPointerBlocker = true;
+							DecImage[c].group = "DecImage";
+							//DecImage[c].onPointerClickObservable.add(function() {
+								//console.log(DecCreateFunc[c]);
+								//console.log(this.onPointerClickObservable);
+								//console.log(this.name);
+								//console.log(leComandos(c));
+								//Decorations[DecCount] = leComandos(c);
+							//});
+							eval(DecorationsTable[c][2]);
+							DecGrid.addControl(DecImage[c], i, j);
+							stepbool = !stepbool;						
+						}
+					
+					AssignDecList();
+					//console.log(DecImage);
+				}
+
+
+				}
+
+				function GenerateDecGrid() {
+					//var DecNumber = parseInt(DecListInput.text);
+					//if (DecNumber !== "NaN" && DecNumber > 0) {
+						//for (var i = 0; i < DecNumber; i += 2) {
+						for (var i = 0; i < 7; i += 2) {
+							DecGrid.addRowDefinition(250, true);	
+						}
+						DecGrid.addColumnDefinition(250, true);
+						DecGrid.addColumnDefinition(250, true);
+						//if (DecNumber>1) {DecGrid.addColumnDefinition(250, true)};	
+						i = DecGrid.rowCount * 250;
+						DecGrid.height = i + "px";
+					//}										
+					DecScrollViewer.thumbLength = parseInt(DecScrollViewer.height) / parseInt(DecGrid.height);
+				}	
+				
+				var DecListSearchTitle = new BABYLON.GUI.TextBlock();
+				DecListSearchTitle.text = "Search";
+				DecListSearchTitle.color = "white";
+				DecListSearchTitle.verticalAlignment = 0;
+				DecListSearchTitle.horizontalAlignment = 0;
+				DecListSearchTitle.left = "16px";
+				DecListSearchTitle.top = "16px";
+				DecListSearchTitle.fontSize = 22;
+				DecListSearchTitle.width = 0.15;
+				DecListSearchTitle.height = "32px";
+				DecList.addControl(DecListSearchTitle);				
+				
+				var DecListInput = new BABYLON.GUI.InputText();
+				DecListInput.text = "";
+				DecListInput.width = 0.75;
+				DecListInput.height = "32px";
+				DecListInput.left = "-16px";
+				DecListInput.color = "White";
+				DecListInput.background = "Black";
+				DecListInput.thickness = 1;
+				DecListInput.verticalAlignment = 0;
+				DecListInput.horizontalAlignment = 1;
+				DecListInput.top = "16px";
+				//v
+				DecListInput.onTextChangedObservable.add(function() {
+					//ClearDecGrid();
+					//setTimeout(ClearDecGrid(), 50);
+					//setTimeout(ClearDecGrid(), 100);
+					//setTimeout(ClearDecGrid(), 150);
+					//setTimeout(GenerateDecGrid(), 400);	
+					//setTimeout(PopulateDecGrid(), 500);
+				});				
+				
+				DecList.addControl(DecListInput);
+
+				GenerateDecGrid();
+				PopulateDecGrid();				
+				
+				//var kakoytoshar = new BABYLON.SceneLoader.ImportMesh("","objects/","shaderBall.glb",scene);
+				//kakoytoshar.position = new BABYLON.Vector3(1,2,3);
+				//kakoytoshar.scaling = new BABYLON.Vector3(0.01, 0.01, 0.01);		
+				
+            return scene;
+        };  
+		
+        /******* End of the create scene function ******/
+
+        var scene = createScene();
+
+        engine.runRenderLoop(function () {
+                scene.render();
+        });
+
+        window.addEventListener("resize", function () {
+                engine.resize();
+        });
+		
+    </script>
+
+   </body>
+
+</html>
