@@ -41,29 +41,29 @@
 		  return Math.floor(Math.random() * (max - min + 1)) + min;
 		}
 
-        let DecorationsMap = [
-            {
+        let DecorationsMap = {
+            box: {
                 title: 'Box',
                 icon: 'textures/box_icon.png',
                 create: function (scene) {
                     return new BABYLON.MeshBuilder.CreateBox("", {size: 1.5}, scene);
                 },
             },
-            {
+            sphere: {
                 title: 'Sphere',
                 icon: 'textures/sphere_icon.png',
                 create: function (scene) {
                     return new BABYLON.MeshBuilder.CreateSphere("", {size: 4}, scene);
                 },
             },
-            {
+            pyramid: {
                 title: 'Pyramid',
                 icon: 'textures/pyramid_icon.png',
                 create: function (scene) {
                     return new BABYLON.MeshBuilder.CreateCylinder("", {diameter: 5, diameterTop: 0, height: 5, tessellation: 4}, scene);
                 },
             },
-        ];
+        }
 
         var createScene = function () {
            
@@ -502,14 +502,17 @@
 
 				function PopulateDecGrid() {
 					if (DecListInput.text == "") {
-						for (let c = 0; c < DecorationsMap.length; c++) {
-							DecImage[c] = new BABYLON.GUI.Image(DecorationsMap[c].title, DecorationsMap[c].icon);
-							DecImage[c].isPointerBlocker = true;
-							DecImage[c].group = "DecImage";
-                            DecImage[c].onPointerClickObservable.add(() => {
-                                Decorations.push(DecorationsMap[c].create());
+					    let i = 0;
+						for (let type in DecorationsMap) {
+						    let image = new BABYLON.GUI.Image(type, DecorationsMap[type].icon);
+                            image.isPointerBlocker = true;
+                            image.group = "DecImage";
+                            image.onPointerClickObservable.add(function (pointer, event) {
+                                Decorations.push(DecorationsMap[event.target.name].create());
                             });
-                            DecGrid.addControl(DecImage[c], c/2, c%2);
+                            DecGrid.addControl(image, i/2, i%2);
+                            DecImage.push(image);
+                            i++;
 						}
                     }
 				}
