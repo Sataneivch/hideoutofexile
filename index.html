@@ -500,22 +500,22 @@
 					DecGrid.height = "0px";
 				}
 
-				function PopulateDecGrid() {
-					if (DecListInput.text == "") {
-					    let i = 0;
-						for (let type in DecorationsMap) {
-						    let image = new BABYLON.GUI.Image(type, DecorationsMap[type].icon);
+                function PopulateDecGrid() {
+                    if (DecListInput.text == "") {
+                        let i = 0;
+                        for (let type in DecorationsMap) {
+                            let image = new BABYLON.GUI.Image(type, DecorationsMap[type].icon);
                             image.isPointerBlocker = true;
                             image.group = "DecImage";
                             image.onPointerClickObservable.add(function (pointer, event) {
                                 Decorations.push(DecorationsMap[event.target.name].create());
                             });
-                            DecGrid.addControl(image, i/2, i%2);
+                            DecGrid.addControl(image, i / 2, i % 2);
                             DecImage.push(image);
                             i++;
-						}
+                        }
                     }
-				}
+                }
 
 				function GenerateDecGrid() {
 					//var DecNumber = parseInt(DecListInput.text);
