@@ -41,6 +41,30 @@
 		  return Math.floor(Math.random() * (max - min + 1)) + min;
 		}
 
+        let DecorationsMap = [
+            {
+                title: 'Box',
+                icon: 'textures/box_icon.png',
+                create: function (scene) {
+                    return new BABYLON.MeshBuilder.CreateBox("", {size: 1.5}, scene);
+                },
+            },
+            {
+                title: 'Sphere',
+                icon: 'textures/sphere_icon.png',
+                create: function (scene) {
+                    return new BABYLON.MeshBuilder.CreateSphere("", {size: 4}, scene);
+                },
+            },
+            {
+                title: 'Pyramid',
+                icon: 'textures/pyramid_icon.png',
+                create: function (scene) {
+                    return new BABYLON.MeshBuilder.CreateCylinder("", {diameter: 5, diameterTop: 0, height: 5, tessellation: 4}, scene);
+                },
+            },
+        ];
+
         var createScene = function () {
            
             var scene = new BABYLON.Scene(engine);
@@ -55,7 +79,6 @@
 			var tempPick;
 			var previousPick = undefined;
 			var Decorations = [];
-			var DecCount = 0;
 			var tempString = "";
 			var DecImage = [];
            
@@ -75,17 +98,7 @@
 			
 			var myGround = BABYLON.MeshBuilder.CreateGround("myGround", {width: 400, height: 400}, scene);
 			myGround.group = "Ground";
-			//myGround.isPickable = false;					
-
-			//--------------------   DECORATIONS TABLE   --------------------
-
-			var DecorationsTable = [
-				['Box','textures/box_icon.png','DecImage[c].onPointerClickObservable.add(function() {Decorations[DecCount] = new BABYLON.MeshBuilder.CreateBox("", {size: 5}, scene);DecCount++;});'],
-				['Sphere','textures/sphere_icon.png','DecImage[c].onPointerClickObservable.add(function() {Decorations[DecCount] = new BABYLON.MeshBuilder.CreateSphere("", {diameter: 5}, scene);DecCount++;});'],
-				['Pyramid','textures/pyramid_icon.png','DecImage[c].onPointerClickObservable.add(function() {Decorations[DecCount] = new BABYLON.MeshBuilder.CreateCylinder("", {diameter: 5, diameterTop: 0, tessellation: 4}, scene);DecCount++;});']
-			];
-			
-			var DecCreateFunc = [];
+			//myGround.isPickable = false;
 			
 			//--------------------   PICKER   --------------------
 								
@@ -490,12 +503,8 @@
 
 				function AssignDecList() {
 					for(i=0;i<DecImage.length;i++) {
-						//console.log(i);
-						tempString = "Decorations[DecCount] = " + DecorationsTable[i][2];
-						console.log(tempString);
 						DecImage[i].onPointerClickObservable.add(function() {
-						eval(tempString);
-						DecCount++;
+                            Decorations.push(DecorationsMap[i].create());
 						});					
 					}
 				}
@@ -503,32 +512,26 @@
 				function PopulateDecGrid() {
 					var stepbool = false;
 					var j = 0;
-					var i = -1;	
-					
+					var i = -1;
 					if (DecListInput.text == "") {
-						for (var c = 0; c < DecorationsTable.length; c++) {
-							DecCreateFunc[c] = DecorationsTable[c][2];
-							if (stepbool == false){j = 0; i++;} else {j = 1};
-							DecImage[c] = new BABYLON.GUI.Image(DecorationsTable[c][0], DecorationsTable[c][1]);
+						for (let c = 0; c < DecorationsMap.length; c++) {
+							if (stepbool == false) {
+							    j = 0;
+							    i++;
+							} else {
+							    j = 1;
+							}
+							DecImage[c] = new BABYLON.GUI.Image(DecorationsMap[c].title, DecorationsMap[c].icon);
 							DecImage[c].isPointerBlocker = true;
 							DecImage[c].group = "DecImage";
-							//DecImage[c].onPointerClickObservable.add(function() {
-								//console.log(DecCreateFunc[c]);
-								//console.log(this.onPointerClickObservable);
-								//console.log(this.name);
-								//console.log(leComandos(c));
-								//Decorations[DecCount] = leComandos(c);
-							//});
-							eval(DecorationsTable[c][2]);
-							DecGrid.addControl(DecImage[c], i, j);
+                            DecImage[c].onPointerClickObservable.add(() => {
+                                Decorations.push(DecorationsMap[c].create());
+                            });
+                            DecGrid.addControl(DecImage[c], i, j);
 							stepbool = !stepbool;						
 						}
-					
-					AssignDecList();
-					//console.log(DecImage);
-				}
-
-
+                        AssignDecList();
+                    }
 				}
 
 				function GenerateDecGrid() {
